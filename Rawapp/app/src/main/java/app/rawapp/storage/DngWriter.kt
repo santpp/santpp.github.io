@@ -5,7 +5,6 @@ import android.content.ContentValues
 import android.hardware.camera2.DngCreator
 import android.media.ExifInterface
 import android.net.Uri
-import android.os.Environment
 import android.provider.MediaStore
 import app.rawapp.camera.RawCapture
 import java.io.IOException
@@ -13,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-const val RAWAPP_RELATIVE_PATH = "${Environment.DIRECTORY_PICTURES}/Rawapp/"
+private const val RAWAPP_RELATIVE_PATH = "Pictures/Rawapp/"
 private const val DNG_MIME = "image/x-adobe-dng"
 
 /** Writes a RAW capture as DNG into Pictures/Rawapp via MediaStore. */
