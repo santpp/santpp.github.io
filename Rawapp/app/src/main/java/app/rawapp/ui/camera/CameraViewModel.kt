@@ -11,6 +11,8 @@ import app.rawapp.camera.CameraController
 import app.rawapp.camera.Lens
 import app.rawapp.camera.captureRotationDegrees
 import app.rawapp.camera.findRawLenses
+import app.rawapp.camera.rawFrameFrom
+import app.rawapp.develop.RawFrame
 import app.rawapp.storage.DngWriter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +53,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _shotState = MutableStateFlow<ShotState>(ShotState.Idle)
     val shotState: StateFlow<ShotState> = _shotState.asStateFlow()
+
+    private val _lastFrame = MutableStateFlow<RawFrame?>(null)
+    val lastFrame: StateFlow<RawFrame?> = _lastFrame.asStateFlow()
 
     private var openJob: Job? = null
     private var shotJob: Job? = null
@@ -97,8 +102,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             _shotState.value = ShotState.Saving
             _shotState.value = try {
                 val rotation = captureRotationDegrees(lens.sensorOrientation, deviceRotation, lens.frontFacing)
-                controller.captureRaw().use { capture ->
-                    withContext(Dispatchers.IO) { writer.write(capture, rotation) }
+                _lastFrame.value = controller.captureRaw().use { capture ->
+                    withContext(Dispatchers.IO) {
+                        writer.write(capture, rotation)
+                        rawFrameFrom(capture, rotation)
+                    }
                 }
                 ShotState.Saved
             } catch (e: CancellationException) {

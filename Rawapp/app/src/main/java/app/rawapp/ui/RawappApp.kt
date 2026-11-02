@@ -10,25 +10,49 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.rawapp.develop.RawFrame
 import app.rawapp.ui.camera.CameraScreen
+import app.rawapp.ui.develop.DevelopScreen
+import app.rawapp.ui.develop.DevelopViewModel
 import app.rawapp.ui.components.MessageScreen
 import app.rawapp.ui.diagnostics.DiagnosticsScreen
 
-private enum class Screen { Camera, Diagnostics }
+private enum class Screen { Camera, Diagnostics, Develop }
 
 @Composable
 fun RawappApp() {
     var screen by rememberSaveable { mutableStateOf(Screen.Camera) }
+    var developFrame by remember { mutableStateOf<RawFrame?>(null) }
     when (screen) {
         Screen.Camera -> CameraPermissionGate {
-            CameraScreen(viewModel(), onOpenDiagnostics = { screen = Screen.Diagnostics })
+            CameraScreen(
+                viewModel(),
+                onOpenDiagnostics = { screen = Screen.Diagnostics },
+                onOpenDevelop = { frame ->
+                    developFrame = frame
+                    screen = Screen.Develop
+                },
+            )
+        }
+        Screen.Develop -> {
+            val frame = developFrame
+            if (frame == null) {
+                screen = Screen.Camera
+            } else {
+                BackHandler { screen = Screen.Camera }
+                val developViewModel: DevelopViewModel = viewModel()
+                LaunchedEffect(frame) { developViewModel.show(frame) }
+                DevelopScreen(developViewModel, onBack = { screen = Screen.Camera })
+            }
         }
         Screen.Diagnostics -> {
             BackHandler { screen = Screen.Camera }
