@@ -43,19 +43,21 @@ class CameraController(
     private var rawReader: ImageReader? = null
     private var characteristics: CameraCharacteristics? = null
     private var previewSurface: Surface? = null
+    private var physicalId: String? = null
 
-    suspend fun open(cameraId: String, preview: Surface) {
+    suspend fun open(lens: Lens, preview: Surface) {
         close()
-        val chars = manager.getCameraCharacteristics(cameraId)
-        val rawSize = largestRawSize(chars) ?: throw CameraException("La cámara $cameraId no ofrece RAW_SENSOR")
+        val chars = manager.getCameraCharacteristics(lens.physicalId ?: lens.logicalId)
+        val rawSize = largestRawSize(chars) ?: throw CameraException("La lente ${lens.label} no ofrece RAW_SENSOR")
         val reader = ImageReader.newInstance(rawSize.width, rawSize.height, ImageFormat.RAW_SENSOR, 2)
         rawReader = reader
         characteristics = chars
         previewSurface = preview
+        physicalId = lens.physicalId
 
-        val opened = openDevice(cameraId)
+        val opened = openDevice(lens.logicalId)
         device = opened
-        val created = createSession(opened, listOf(preview, reader.surface))
+        val created = createSession(opened, listOf(preview, reader.surface), lens.physicalId)
         session = created
         startPreview(opened, created, preview)
     }
@@ -93,10 +95,20 @@ class CameraController(
         val result = try {
             resultReady.await()
         } catch (e: Exception) {
-            imageReady.cancel()
+            discard(imageReady)
             throw e
         }
-        return RawCapture(imageReady.await(), result, chars)
+        val lensResult = physicalId?.let { id ->
+            result.physicalCameraTotalResults[id] ?: run {
+                discard(imageReady)
+                throw CameraException("Falta el resultado de la lente física $id")
+            }
+        } ?: result
+        return RawCapture(imageReady.await(), lensResult, chars)
+    }
+
+    private suspend fun discard(pending: CompletableDeferred<Image>) {
+        if (pending.isCompleted) runCatching { pending.await() }.getOrNull()?.close() else pending.cancel()
     }
 
     fun close() {
@@ -108,6 +120,7 @@ class CameraController(
         rawReader = null
         characteristics = null
         previewSurface = null
+        physicalId = null
     }
 
     fun release() {
@@ -145,11 +158,18 @@ class CameraController(
             }
         }
 
-    private suspend fun createSession(dev: CameraDevice, surfaces: List<Surface>): CameraCaptureSession =
+    private suspend fun createSession(
+        dev: CameraDevice,
+        surfaces: List<Surface>,
+        physicalId: String?,
+    ): CameraCaptureSession =
         suspendCancellableCoroutine { cont ->
+            val outputs = surfaces.map { surface ->
+                OutputConfiguration(surface).apply { physicalId?.let(::setPhysicalCameraId) }
+            }
             val config = SessionConfiguration(
                 SessionConfiguration.SESSION_REGULAR,
-                surfaces.map(::OutputConfiguration),
+                outputs,
                 executor,
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(s: CameraCaptureSession) {

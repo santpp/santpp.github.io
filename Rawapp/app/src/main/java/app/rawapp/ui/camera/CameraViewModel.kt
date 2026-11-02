@@ -8,9 +8,9 @@ import android.view.Surface
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.rawapp.camera.CameraController
-import app.rawapp.camera.SelectedCamera
+import app.rawapp.camera.Lens
 import app.rawapp.camera.captureRotationDegrees
-import app.rawapp.camera.selectRawCamera
+import app.rawapp.camera.findRawLenses
 import app.rawapp.storage.DngWriter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 sealed interface CameraUiState {
     data object Loading : CameraUiState
     data object RawUnsupported : CameraUiState
-    data class Ready(val camera: SelectedCamera) : CameraUiState
+    data class Ready(val lenses: List<Lens>, val selected: Lens) : CameraUiState
     data class Error(val message: String) : CameraUiState
 }
 
@@ -64,12 +64,17 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         selectCamera()
     }
 
-    fun start(surface: Surface) {
-        val camera = (_uiState.value as? CameraUiState.Ready)?.camera ?: return
+    fun selectLens(lens: Lens) {
+        val ready = _uiState.value as? CameraUiState.Ready ?: return
+        if (_shotState.value == ShotState.Saving) return
+        _uiState.value = ready.copy(selected = lens)
+    }
+
+    fun start(lens: Lens, surface: Surface) {
         openJob?.cancel()
         openJob = viewModelScope.launch {
             try {
-                controller.open(camera.id, surface)
+                controller.open(lens, surface)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -86,12 +91,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun shoot(deviceRotation: Int) {
-        val camera = (_uiState.value as? CameraUiState.Ready)?.camera ?: return
+        val lens = (_uiState.value as? CameraUiState.Ready)?.selected ?: return
         if (_shotState.value == ShotState.Saving) return
         shotJob = viewModelScope.launch {
             _shotState.value = ShotState.Saving
             _shotState.value = try {
-                val rotation = captureRotationDegrees(camera.sensorOrientation, deviceRotation)
+                val rotation = captureRotationDegrees(lens.sensorOrientation, deviceRotation, lens.frontFacing)
                 controller.captureRaw().use { capture ->
                     withContext(Dispatchers.IO) { writer.write(capture, rotation) }
                 }
@@ -112,7 +117,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun selectCamera() {
         _uiState.value = try {
-            selectRawCamera(manager)?.let(CameraUiState::Ready) ?: CameraUiState.RawUnsupported
+            val lenses = findRawLenses(manager)
+            val main = lenses.firstOrNull { it.label == "1×" } ?: lenses.firstOrNull()
+            if (main == null) CameraUiState.RawUnsupported else CameraUiState.Ready(lenses, main)
         } catch (e: CameraAccessException) {
             CameraUiState.Error(e.message ?: "No se pudo consultar la cámara")
         }

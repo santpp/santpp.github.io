@@ -16,6 +16,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -37,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.rawapp.camera.SelectedCamera
+import app.rawapp.camera.Lens
 import app.rawapp.ui.components.GlassIconButton
 import app.rawapp.ui.components.GlassPill
 import app.rawapp.ui.components.MessageScreen
@@ -61,7 +69,7 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit) {
             actionLabel = "Reintentar",
             onAction = viewModel::retry,
         )
-        is CameraUiState.Ready -> CameraContent(state.camera, viewModel, onOpenDiagnostics)
+        is CameraUiState.Ready -> CameraContent(state, viewModel, onOpenDiagnostics)
     }
 }
 
@@ -73,27 +81,28 @@ private fun LoadingState() {
 }
 
 @Composable
-private fun CameraContent(camera: SelectedCamera, viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit) {
+private fun CameraContent(state: CameraUiState.Ready, viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit) {
+    val lens = state.selected
     val shotState by viewModel.shotState.collectAsStateWithLifecycle()
     val deviceRotation by rememberDeviceRotation()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     var surface by remember { mutableStateOf<Surface?>(null) }
     val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
 
-    LaunchedEffect(surface, resumed) {
+    LaunchedEffect(surface, resumed, lens) {
         val current = surface
-        if (current != null && resumed) viewModel.start(current) else viewModel.stop()
+        if (current != null && resumed) viewModel.start(lens, current) else viewModel.stop()
     }
     DisposableEffect(Unit) { onDispose { viewModel.stop() } }
 
     Box(Modifier.fillMaxSize().background(RawappColors.Background)) {
         CameraPreview(
-            previewSize = camera.previewSize,
+            previewSize = lens.previewSize,
             onSurfaceAvailable = { surface = it },
             onSurfaceDestroyed = { surface = null },
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(camera.previewSize.height.toFloat() / camera.previewSize.width)
+                .aspectRatio(lens.previewSize.height.toFloat() / lens.previewSize.width)
                 .align(Alignment.Center),
         )
         Row(
@@ -116,6 +125,9 @@ private fun CameraContent(camera: SelectedCamera, viewModel: CameraViewModel, on
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             ShotStatus(shotState)
+            if (state.lenses.size > 1) {
+                LensSelector(state.lenses, lens, enabled = shotState != ShotState.Saving, onSelect = viewModel::selectLens)
+            }
             ShutterButton(
                 enabled = shotState != ShotState.Saving,
                 onClick = { viewModel.shoot(deviceRotation) },
@@ -132,6 +144,34 @@ private fun ShotStatus(state: ShotState) {
             ShotState.Saved -> GlassPill("Guardado en Pictures/Rawapp", color = RawappColors.Accent)
             is ShotState.Failed -> GlassPill("Error al guardar: ${state.message}", color = RawappColors.Error)
             ShotState.Idle -> Unit
+        }
+    }
+}
+
+@Composable
+private fun LensSelector(lenses: List<Lens>, selected: Lens, enabled: Boolean, onSelect: (Lens) -> Unit) {
+    Row(
+        modifier = Modifier.glass(RoundedCornerShape(50)).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        lenses.forEach { lens ->
+            val isSelected = lens == selected
+            Box(
+                modifier = Modifier
+                    .height(48.dp)
+                    .widthIn(min = 56.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isSelected) RawappColors.GlassFill else Color.Transparent)
+                    .selectable(selected = isSelected, enabled = enabled, role = Role.Tab) { onSelect(lens) }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    lens.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) RawappColors.Accent else RawappColors.TextPrimary,
+                )
+            }
         }
     }
 }

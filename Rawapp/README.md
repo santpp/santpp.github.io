@@ -35,7 +35,8 @@ app/src/main/java/app/rawapp/
   MainActivity.kt                 Activity única, edge-to-edge
   camera/
     CameraController.kt           CameraDevice + sesión (preview + RAW_SENSOR), captura, liberación
-    CameraSelection.kt            Elige la cámara trasera con RAW y el tamaño de preview
+    Lens.kt                       Lentes con RAW (físicas dentro de la cámara lógica) y su preview
+    ZoomLabel.kt                  Etiqueta "0,5×", "1×"… (función pura, testeada)
     CameraCapabilities.kt         Lectura de capacidades para el diagnóstico
     CaptureOrientation.kt         Rotación de la captura (función pura, testeada)
     RawCapture.kt                 Image RAW + resultado + características
@@ -70,6 +71,7 @@ app/src/test/                     Tests unitarios de funciones puras
 
 ## Limitaciones conocidas
 
-- Solo se usa la cámara trasera lógica principal. La ultra gran angular y la frontal aparecen en el diagnóstico, pero no se pueden seleccionar.
+- Selector de lente: 0,5× (ultra gran angular), 1× (principal) y frontal. Las traseras se abren como streams físicos de la cámara lógica, y el DNG lleva las matrices y el resultado de la lente física. Si el sistema no admite RAW en una lente física, se muestra el error con "Reintentar".
+- La etiqueta de zoom se calcula a partir de la focal y el tamaño del sensor, así que es aproximada.
 - La interfaz está fijada en vertical. La orientación de la foto se calcula con el sensor de orientación y se escribe en el DNG.
 - El efecto cristal no desenfoca la preview, por la limitación de Compose ya explicada.

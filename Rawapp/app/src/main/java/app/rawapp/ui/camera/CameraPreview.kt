@@ -28,5 +28,6 @@ fun CameraPreview(
                 })
             }
         },
+        update = { view -> view.holder.setFixedSize(previewSize.width, previewSize.height) },
     )
 }
