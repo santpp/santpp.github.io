@@ -33,9 +33,17 @@ class FilmLutTest {
     }
 
     @Test
-    fun shadowsLeanCool() {
+    fun shadowsLeanTeal() {
         val out = gradeColor(Vec3(0.02, 0.02, 0.02), look)
         assertTrue(out.z > out.x)
+        assertTrue(out.y > out.x)
+    }
+
+    @Test
+    fun highlightsLeanCream() {
+        val out = gradeColor(Vec3(0.8, 0.8, 0.8), look)
+        assertTrue(out.x > out.y)
+        assertTrue(out.y > out.z)
     }
 
     @Test

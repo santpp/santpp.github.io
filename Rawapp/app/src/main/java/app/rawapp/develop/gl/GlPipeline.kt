@@ -117,6 +117,7 @@ internal class GlPipeline(assets: AssetManager) : AutoCloseable {
         GLES30.glUniform1f(look.uniform("uLutSize"), LUT_SIZE.toFloat())
         GLES30.glUniform1f(look.uniform("uHalationAmount"), params.halation)
         GLES30.glUniform1f(look.uniform("uGrainAmount"), params.grain)
+        GLES30.glUniform1f(look.uniform("uVignette"), FilmLook.VIGNETTE)
         GLES30.glUniform1i(look.uniform("uLookEnabled"), if (lookEnabled) 1 else 0)
         drawFullscreen()
     }

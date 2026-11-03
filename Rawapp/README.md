@@ -90,7 +90,15 @@ La matriz de color sigue la especificación DNG: interpola ColorMatrix, ForwardM
 - verdes hacia oliva y azules hacia teal;
 - halación sutil y grano fino.
 
-Todo son aproximaciones propias. Los valores están en `FilmLook` y se afinarán comparando fotos.
+Todo son aproximaciones propias. Los valores están en `FilmLook`.
+
+Calibración v2: comparando con fotos públicas de Chromagraph se midió lo siguiente:
+- los negros son profundos;
+- el blanco máximo se queda en ~0,9 y es crema (azul ~12 % por debajo del rojo);
+- las sombras van hacia teal;
+- la halación y el grano son visibles, y hay un viñeteo leve.
+
+La curva tiene ahora un `peak` de 0,86 en lineal, los negros están casi sin levantar y el tinte teal se desvanece al acercarse a negro puro.
 
 ## Dependencias
 

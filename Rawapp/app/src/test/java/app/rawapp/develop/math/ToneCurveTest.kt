@@ -20,10 +20,10 @@ class ToneCurveTest {
     }
 
     @Test
-    fun shoulderApproachesWhiteWithoutClipping() {
-        assertTrue(curve.apply(1.0) < 0.9)
-        assertTrue(curve.apply(64.0) < 1.0)
-        assertTrue(curve.apply(64.0) > 0.97)
+    fun shoulderApproachesPeakWithoutClipping() {
+        assertTrue(curve.apply(1.0) < 0.9 * curve.peak)
+        assertTrue(curve.apply(64.0) < curve.peak)
+        assertTrue(curve.apply(64.0) > 0.97 * curve.peak)
     }
 
     @Test

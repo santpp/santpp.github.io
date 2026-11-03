@@ -1,5 +1,5 @@
 #version 300 es
-// Halation, gamut compression, filmic tone curve, 3D colour LUT, grain, sRGB.
+// Halation, vignette, gamut compression, filmic tone curve, 3D colour LUT, grain, sRGB.
 precision highp float;
 precision highp sampler3D;
 
@@ -11,6 +11,7 @@ uniform vec2 uCurveStops;       // min, max stops
 uniform float uLutSize;
 uniform float uHalationAmount;
 uniform float uGrainAmount;
+uniform float uVignette;
 uniform bool uLookEnabled;
 
 out vec4 outColor;
@@ -71,6 +72,8 @@ void main() {
     }
 
     scene += texture(uHalation, uv).rgb * HALATION_TINT * uHalationAmount;
+    vec2 centered = uv * 2.0 - 1.0;
+    scene *= 1.0 - uVignette * smoothstep(0.3, 2.0, dot(centered, centered));
     scene = compressGamut(max(scene, vec3(-0.05)));
     vec3 display = vec3(toneCurve(scene.r), toneCurve(scene.g), toneCurve(scene.b));
 
