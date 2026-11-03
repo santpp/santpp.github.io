@@ -132,6 +132,15 @@ Calibración v3: se comparó una pareja de fotos de la misma escena, una de la c
 - **Zoom (1×–3×):** se pellizca en el visor. El RAW siempre es el sensor completo, así que el zoom es un **recorte central**. El visor se amplía al instante y el recorte se guarda en el sidecar de la foto. Se aplica al revelar en la galería, al exportar y al auto-exportar. En el detalle se puede cambiar después con el slider *Recorte*, y el DNG no se toca. A 3× quedan unos 1,3 MP de los 12 MP originales.
 - **Compartir de una vez:** tras cada disparo aparece un botón de compartir a la derecha del disparador. Ese botón revela el último DNG con el look y su recorte, lo exporta en el formato elegido y abre el menú de compartir de Android.
 
+## Modo Pro
+
+- **Activación:** con el selector **Auto | Pro** arriba a la izquierda de la cámara. Solo aparece si la lente tiene la capacidad `MANUAL_SENSOR`.
+- **Ajustes:** ISO y obturación, en pasos estándar de 1/3 de paso, dentro del rango del sensor. La obturación va de 1/8000 s a 1 s; más tiempo haría inutilizable la vista previa. Los dos sliders aumentan la luz hacia la derecha.
+- **Valores iniciales:** al entrar en Pro se parte de la ISO y la velocidad que estaba usando la exposición automática.
+- **Aplicación:** los valores se aplican a la vista previa y al disparo, con `CONTROL_AE_MODE_OFF`. Con lentes físicas también se envían como claves de la cámara física.
+- **Al cambiar de lente** se vuelve a Auto, porque los rangos cambian.
+- **Revelado:** la exposición automática del revelado sigue activa en Pro. Para conservar a la vista la exposición elegida, compénsala con el slider *Exposición* de la galería.
+
 ## Firma
 
 `signing/rawapp.keystore` es la clave de depuración con la que se firmaron los primeros APK. Va en el repositorio para que cualquier compilación, en cualquier máquina, produzca APK que se instalen encima sin desinstalar. Es una clave de depuración sin valor de seguridad: no la uses para publicar nada.
@@ -156,6 +165,7 @@ Las fases 2 y 3 no añaden dependencias: EGL, GLES y MediaStore vienen en el SDK
 - La etiqueta de zoom se calcula a partir de la focal y el tamaño del sensor, así que es aproximada.
 - La interfaz está fijada en vertical. La orientación de la foto se calcula con el sensor de orientación y se escribe en el DNG.
 - El efecto cristal no desenfoca la preview, por la limitación de Compose ya explicada.
+- Si otra app ocupa la cámara mientras Rawapp está en segundo plano, se muestra el error y la cámara se reabre sola al volver a la app.
 - La galería solo ve los DNG creados por esta instalación de Rawapp. MediaStore da acceso sin permisos a los archivos propios. Si desinstalas la app, las fotos siguen en `Pictures/Rawapp/`, pero la galería no las verá.
 - El lector DNG solo admite el formato que escribe `DngCreator`: Bayer, 16 bits, sin compresión.
 - La exposición automática del revelado (de −1 a +3 EV) compensa la subexposición del RAW del Pixel. Se puede ajustar en la Fase 3.

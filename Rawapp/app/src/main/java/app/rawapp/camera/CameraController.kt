@@ -10,6 +10,7 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureFailure
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
@@ -44,6 +45,21 @@ class CameraController(
     private var characteristics: CameraCharacteristics? = null
     private var previewSurface: Surface? = null
     private var physicalId: String? = null
+    private var manual: ManualExposure? = null
+
+    /** Latest auto-exposure values from the preview, used to seed Pro mode. */
+    @Volatile
+    var lastAutoExposure: ManualExposure? = null
+        private set
+
+    /** Switches between auto exposure (null) and fixed ISO/shutter; applies to preview and captures. */
+    fun setManualExposure(value: ManualExposure?) {
+        manual = value
+        val dev = device ?: return
+        val ses = session ?: return
+        val preview = previewSurface ?: return
+        startPreview(dev, ses, preview)
+    }
 
     suspend fun open(lens: Lens, preview: Surface) {
         close()
@@ -78,6 +94,7 @@ class CameraController(
             addTarget(reader.surface)
             previewSurface?.let(::addTarget)
             set(CaptureRequest.STATISTICS_LENS_SHADING_MAP_MODE, CameraMetadata.STATISTICS_LENS_SHADING_MAP_MODE_ON)
+            applyExposure(this)
         }.build()
 
         ses.capture(request, object : CameraCaptureSession.CaptureCallback() {
@@ -121,6 +138,7 @@ class CameraController(
         characteristics = null
         previewSurface = null
         physicalId = null
+        lastAutoExposure = null
     }
 
     fun release() {
@@ -188,8 +206,33 @@ class CameraController(
         val request = dev.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
             addTarget(preview)
             set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+            applyExposure(this)
         }.build()
-        ses.setRepeatingRequest(request, null, handler)
+        ses.setRepeatingRequest(request, autoExposureTracker, handler)
+    }
+
+    private val autoExposureTracker = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(s: CameraCaptureSession, r: CaptureRequest, result: TotalCaptureResult) {
+            if (manual != null) return
+            val lensResult = physicalId?.let { result.physicalCameraTotalResults[it] } ?: result
+            val iso = lensResult.get(CaptureResult.SENSOR_SENSITIVITY) ?: return
+            val exposure = lensResult.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: return
+            lastAutoExposure = ManualExposure(iso, exposure)
+        }
+    }
+
+    /** Manual sensor keys go to the physical lens when streaming from one, and to the logical camera otherwise. */
+    private fun applyExposure(builder: CaptureRequest.Builder) {
+        val m = manual ?: return
+        val physical = physicalId
+        builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+        fun <T> put(key: CaptureRequest.Key<T>, value: T) {
+            builder.set(key, value)
+            if (physical != null) builder.setPhysicalCameraKey(key, value, physical)
+        }
+        put(CaptureRequest.SENSOR_SENSITIVITY, m.iso)
+        put(CaptureRequest.SENSOR_EXPOSURE_TIME, m.exposureNs)
+        put(CaptureRequest.SENSOR_FRAME_DURATION, m.exposureNs)
     }
 
     private fun deviceErrorMessage(error: Int): String = when (error) {

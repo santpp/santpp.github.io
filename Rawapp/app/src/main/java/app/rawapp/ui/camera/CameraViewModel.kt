@@ -10,6 +10,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.rawapp.camera.CameraController
 import app.rawapp.camera.Lens
+import app.rawapp.camera.ManualExposure
+import app.rawapp.camera.nearestStop
 import app.rawapp.camera.captureRotationDegrees
 import app.rawapp.camera.findRawLenses
 import app.rawapp.RawappApplication
@@ -50,6 +52,8 @@ sealed interface ShotState {
 }
 
 private const val SHOT_MESSAGE_MS = 2_500L
+private const val DEFAULT_ISO = 100
+private const val DEFAULT_EXPOSURE_NS = 8_000_000L
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -70,6 +74,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _zoom = MutableStateFlow(1f)
     val zoom: StateFlow<Float> = _zoom.asStateFlow()
+
+    /** Null in Auto mode; the fixed ISO and shutter in Pro mode. */
+    private val _manual = MutableStateFlow<ManualExposure?>(null)
+    val manual: StateFlow<ManualExposure?> = _manual.asStateFlow()
 
     private val _lastShot = MutableStateFlow<SavedDng?>(null)
     val lastShot: StateFlow<SavedDng?> = _lastShot.asStateFlow()
@@ -94,6 +102,33 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         if (_shotState.value == ShotState.Saving) return
         _uiState.value = ready.copy(selected = lens)
         _zoom.value = 1f
+        applyManual(null)
+    }
+
+    /** Enters Pro mode starting from the exposure auto mode was using, snapped to standard stops. */
+    fun setProMode(enabled: Boolean) {
+        val range = (_uiState.value as? CameraUiState.Ready)?.selected?.manualRange ?: return
+        if (!enabled) return applyManual(null)
+        val seed = controller.lastAutoExposure ?: ManualExposure(DEFAULT_ISO, DEFAULT_EXPOSURE_NS)
+        applyManual(
+            ManualExposure(
+                iso = nearestStop(range.isoStops, seed.iso.toDouble()),
+                exposureNs = nearestStop(range.shutterStops, seed.exposureNs.toDouble()),
+            ),
+        )
+    }
+
+    fun setIso(iso: Int) {
+        _manual.value?.let { applyManual(it.copy(iso = iso)) }
+    }
+
+    fun setShutter(exposureNs: Long) {
+        _manual.value?.let { applyManual(it.copy(exposureNs = exposureNs)) }
+    }
+
+    private fun applyManual(value: ManualExposure?) {
+        _manual.value = value
+        controller.setManualExposure(value)
     }
 
     fun setZoom(value: Float) {

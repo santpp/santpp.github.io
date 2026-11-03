@@ -28,7 +28,13 @@ import app.rawapp.ui.components.shareImage
 import app.rawapp.ui.gallery.zoomLabel
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToInt
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +52,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.rawapp.camera.Lens
+import app.rawapp.camera.ManualExposure
+import app.rawapp.camera.ManualRange
+import app.rawapp.camera.formatShutter
 import app.rawapp.ui.components.GlassIconButton
 import app.rawapp.ui.components.GlassPill
 import app.rawapp.ui.components.GlassSegmented
@@ -62,6 +71,11 @@ fun CameraScreen(
     onOpenSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    LaunchedEffect(resumed) {
+        if (resumed && uiState is CameraUiState.Error) viewModel.retry()
+    }
     when (val state = uiState) {
         CameraUiState.Loading -> LoadingState()
         CameraUiState.RawUnsupported -> MessageScreen(
@@ -98,6 +112,7 @@ private fun CameraContent(
     val lens = state.selected
     val shotState by viewModel.shotState.collectAsStateWithLifecycle()
     val zoom by viewModel.zoom.collectAsStateWithLifecycle()
+    val manual by viewModel.manual.collectAsStateWithLifecycle()
     val lastShot by viewModel.lastShot.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LaunchedEffect(viewModel) { viewModel.shareRequests.collect { context.shareImage(it.uri, it.mimeType) } }
@@ -139,7 +154,18 @@ private fun CameraContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GlassPill("RAW · DNG")
+            val range = lens.manualRange
+            if (range == null) {
+                GlassPill("RAW · DNG")
+            } else {
+                GlassSegmented(
+                    options = listOf(false, true),
+                    selected = manual != null,
+                    label = { pro -> if (pro) "Pro" else "Auto" },
+                    onSelect = viewModel::setProMode,
+                    enabled = shotState != ShotState.Saving,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GlassIconButton(Icons.Outlined.Settings, "Ajustes", onOpenSettings)
                 GlassIconButton(Icons.Outlined.Info, "Diagnóstico de cámaras", onOpenDiagnostics)
@@ -155,6 +181,11 @@ private fun CameraContent(
         ) {
             ShotStatus(shotState)
             if (zoom > 1.01f) GlassPill(zoomLabel(zoom), color = RawappColors.Accent)
+            val m = manual
+            val range = lens.manualRange
+            if (m != null && range != null) {
+                ProControls(m, range, onIso = viewModel::setIso, onShutter = viewModel::setShutter)
+            }
             if (state.lenses.size > 1) {
                 GlassSegmented(
                     options = state.lenses,
@@ -216,3 +247,60 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit, modifier: Modif
         )
     }
 }
+
+private enum class ProSetting(val label: String) { Iso("ISO"), Shutter("Obturación") }
+
+/** ISO and shutter selection; each slider moves through standard stops only. */
+@Composable
+private fun ProControls(
+    manual: ManualExposure,
+    range: ManualRange,
+    onIso: (Int) -> Unit,
+    onShutter: (Long) -> Unit,
+) {
+    var setting by rememberSaveable { mutableStateOf(ProSetting.Iso) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .glass(RoundedCornerShape(28.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        GlassSegmented(
+            options = ProSetting.entries,
+            selected = setting,
+            label = { s ->
+                when (s) {
+                    ProSetting.Iso -> "ISO ${manual.iso}"
+                    ProSetting.Shutter -> formatShutter(manual.exposureNs)
+                }
+            },
+            onSelect = { setting = it },
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        when (setting) {
+            ProSetting.Iso -> StopSlider(range.isoStops, manual.iso, onIso)
+            ProSetting.Shutter -> StopSlider(range.shutterStops, manual.exposureNs, onShutter)
+        }
+    }
+}
+
+@Composable
+private fun <T> StopSlider(stops: List<T>, value: T, onChange: (T) -> Unit) {
+    val index = stops.indexOf(value).coerceAtLeast(0)
+    Slider(
+        value = index.toFloat(),
+        onValueChange = { i -> stops[i.roundToInt().coerceIn(0, stops.lastIndex)].let { if (it != value) onChange(it) } },
+        valueRange = 0f..stops.lastIndex.toFloat().coerceAtLeast(1f),
+        steps = (stops.size - 2).coerceAtLeast(0),
+        colors = SliderDefaults.colors(
+            thumbColor = RawappColors.TextPrimary,
+            activeTrackColor = RawappColors.Accent,
+            inactiveTrackColor = RawappColors.GlassFill,
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent,
+        ),
+    )
+}
+

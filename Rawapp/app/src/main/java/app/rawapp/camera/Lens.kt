@@ -17,7 +17,12 @@ data class Lens(
     val frontFacing: Boolean,
     val previewSize: Size,
     val sensorOrientation: Int,
+    /** Null when the lens has no manual sensor control (Pro mode is then hidden). */
+    val manualRange: ManualRange?,
 )
+
+/** Sensor limits for Pro mode. */
+data class ManualRange(val isoStops: List<Int>, val shutterStops: List<Long>)
 
 private const val MAX_PREVIEW_PIXELS = 1920 * 1440
 private const val ULTRA_WIDE_RATIO = 0.75f
@@ -69,7 +74,18 @@ private fun toLens(c: Candidate, label: String): Lens? {
         frontFacing = c.frontFacing,
         previewSize = previewSizeMatching(c.chars, raw) ?: return null,
         sensorOrientation = c.chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0,
+        manualRange = manualRange(c.chars),
     )
+}
+
+private fun manualRange(chars: CameraCharacteristics): ManualRange? {
+    val manual = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+        ?.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) == true
+    val iso = chars.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+    val exposure = chars.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+    if (!manual || iso == null || exposure == null) return null
+    val range = ManualRange(isoStops(iso.lower, iso.upper), shutterStops(exposure.lower, exposure.upper))
+    return range.takeIf { it.isoStops.isNotEmpty() && it.shutterStops.isNotEmpty() }
 }
 
 /** Focal length divided by sensor width: proportional to the lens' magnification. */
