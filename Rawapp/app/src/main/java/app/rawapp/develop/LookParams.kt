@@ -15,25 +15,25 @@ data class LookParams(
 
 /** The fixed character of the look, derived from [LookParams]. */
 object FilmLook {
-    private const val BASE_CONTRAST = 1.45
+    private const val BASE_CONTRAST = 1.6
     const val HALATION_THRESHOLD = 0.75f
     const val VIGNETTE = 0.22f
 
     fun toneCurve(params: LookParams) = ToneCurve(
         contrast = BASE_CONTRAST * params.contrast,
         blackLift = 0.0015,
-        midGreyOut = 0.17,
+        midGreyOut = 0.12,
         peak = 0.86,
     )
 
     fun color(params: LookParams) = FilmColor(
-        saturation = 1.0 * params.saturation,
-        highlightDesaturation = 0.45,
+        saturation = 0.9 * params.saturation,
+        highlightDesaturation = 0.65,
         shadowDesaturation = 0.1,
         density = 0.6,
         shadowCool = 1.0,
         highlightWarm = 1.0,
-        greenToOlive = 0.2,
-        blueToTeal = 0.6,
+        greenToOlive = 0.6,
+        blueToTeal = 1.0,
     )
 }

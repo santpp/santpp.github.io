@@ -100,6 +100,10 @@ Calibración v2: comparando con fotos públicas de Chromagraph se midió lo sigu
 
 La curva tiene ahora un `peak` de 0,86 en lineal, los negros están casi sin levantar y el tinte teal se desvanece al acercarse a negro puro.
 
+Calibración v3: se comparó una pareja de fotos de la misma escena, una de la cámara del móvil y otra de Chromagraph.
+- **Cambios observados:** el cielo azul claro pasa a crema cálido, la mediana baja de 0,36 a 0,21 (un look denso) y los verdes van hacia oliva y más oscuros.
+- **Ajustes:** contraste 1,6, gris medio en 0,12, exposición automática más baja, altas luces más cálidas y desaturadas, azules saturados hacia teal con menos densidad de azul, y verdes hacia oliva.
+
 ## Dependencias
 
 - `androidx.activity:activity-compose`: `setContent`, el contrato de permisos y `BackHandler`.

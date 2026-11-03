@@ -22,7 +22,7 @@ fun gradeColor(c: Vec3, look: FilmColor): Vec3 {
     var rgb = c
     val y = luminance709(rgb)
 
-    val highlightMask = smoothstep(0.45, 0.9, y)
+    val highlightMask = smoothstep(0.3, 0.85, y)
     val shadowMask = 1.0 - smoothstep(0.0, 0.12, y)
     val sat = look.saturation *
         (1.0 - look.highlightDesaturation * highlightMask) *
@@ -35,14 +35,18 @@ fun gradeColor(c: Vec3, look: FilmColor): Vec3 {
 
     val greenExcess = (rgb.y - maxOf(rgb.x, rgb.z)).coerceAtLeast(0.0)
     val blueExcess = (rgb.z - maxOf(rgb.x, rgb.y)).coerceAtLeast(0.0)
-    rgb = Vec3(rgb.x + look.greenToOlive * 0.35 * greenExcess, rgb.y + look.blueToTeal * 0.25 * blueExcess, rgb.z)
+    rgb = Vec3(
+        rgb.x + look.greenToOlive * 0.35 * greenExcess,
+        rgb.y - look.greenToOlive * 0.2 * greenExcess + look.blueToTeal * 0.3 * blueExcess,
+        rgb.z - look.blueToTeal * 0.35 * blueExcess,
+    )
 
     val teal = look.shadowCool * shadowMask * smoothstep(0.0, 0.04, y) * 0.01
     val warm = look.highlightWarm * highlightMask
     rgb = Vec3(
-        (rgb.x - teal) * (1.0 + 0.02 * warm),
-        (rgb.y + teal * 0.8) * (1.0 - 0.02 * warm),
-        (rgb.z + teal) * (1.0 - 0.14 * warm),
+        (rgb.x - teal) * (1.0 + 0.07 * warm),
+        (rgb.y + teal) * (1.0 - 0.03 * warm),
+        (rgb.z + teal * 0.6) * (1.0 - 0.2 * warm),
     )
     return rgb.map { it.coerceIn(0.0, 1.0) }
 }
