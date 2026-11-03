@@ -15,6 +15,7 @@ object SidecarCodec {
         "saturation" to p.saturation,
         "grain" to p.grain,
         "halation" to p.halation,
+        "zoom" to p.zoom,
     ).joinToString(",\n  ", "{\n  ", "\n}\n") { (k, v) -> "\"$k\": ${String.format(Locale.US, "%.4f", v)}" }
 
     fun decode(json: String): LookParams {
@@ -27,6 +28,7 @@ object SidecarCodec {
             saturation = values["saturation"] ?: d.saturation,
             grain = values["grain"] ?: d.grain,
             halation = values["halation"] ?: d.halation,
+            zoom = values["zoom"] ?: d.zoom,
         )
     }
 }

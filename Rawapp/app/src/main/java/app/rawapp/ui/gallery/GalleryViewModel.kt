@@ -10,8 +10,8 @@ import app.rawapp.develop.RawFrame
 import app.rawapp.develop.subsampled
 import app.rawapp.gallery.GalleryRepository
 import app.rawapp.gallery.Photo
-import android.net.Uri
 import app.rawapp.storage.PhotoExporter
+import app.rawapp.storage.SharedFile
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -56,8 +56,6 @@ private const val PREVIEW_SUBSAMPLE = 2
 private const val THUMB_MAX_SIDE = 360
 private const val FULL_RENDER_DELAY_MS = 350L
 private const val MESSAGE_MS = 2_500L
-
-data class SharedFile(val uri: Uri, val mimeType: String)
 
 private data class RenderRequest(val params: LookParams, val lookEnabled: Boolean)
 

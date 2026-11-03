@@ -127,6 +127,11 @@ Calibración v3: se comparó una pareja de fotos de la misma escena, una de la c
 - **Compartir:** desde el detalle. Exporta en el formato elegido a `Exports/` y abre el selector de Android con esa foto. Así lo que compartes es siempre igual a lo que queda guardado.
 - **Contexto GL compartido:** la cámara y la galería usan un único `RawDeveloper` que vive en `RawappApplication`. Así solo existe un contexto EGL y un juego de buffers de GPU, y se libera cuando termina el proceso.
 
+## Zoom digital y compartir rápido
+
+- **Zoom (1×–3×):** se pellizca en el visor. El RAW siempre es el sensor completo, así que el zoom es un **recorte central**. El visor se amplía al instante y el recorte se guarda en el sidecar de la foto. Se aplica al revelar en la galería, al exportar y al auto-exportar. En el detalle se puede cambiar después con el slider *Recorte*, y el DNG no se toca. A 3× quedan unos 1,3 MP de los 12 MP originales.
+- **Compartir de una vez:** tras cada disparo aparece un botón de compartir a la derecha del disparador. Ese botón revela el último DNG con el look y su recorte, lo exporta en el formato elegido y abre el menú de compartir de Android.
+
 ## Firma
 
 `signing/rawapp.keystore` es la clave de depuración con la que se firmaron los primeros APK. Va en el repositorio para que cualquier compilación, en cualquier máquina, produzca APK que se instalen encima sin desinstalar. Es una clave de depuración sin valor de seguridad: no la uses para publicar nada.

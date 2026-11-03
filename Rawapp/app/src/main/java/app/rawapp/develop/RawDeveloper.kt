@@ -30,7 +30,7 @@ class RawDeveloper(private val assets: AssetManager) : AutoCloseable {
             val start = SystemClock.elapsedRealtime()
             val bitmap = gl.render(frame, color, 2.0.pow(ev).toFloat(), params, lookEnabled)
             val millis = SystemClock.elapsedRealtime() - start
-            DevelopResult(bitmap.rotated(frame.rotationDegrees), millis)
+            DevelopResult(bitmap.rotated(frame.rotationDegrees).centerCropped(params.zoom), millis)
         }
 
     override fun close() {
@@ -40,6 +40,16 @@ class RawDeveloper(private val assets: AssetManager) : AutoCloseable {
         }
         executor.shutdown()
     }
+}
+
+/** Digital zoom: keeps the centre 1/zoom of the frame. */
+private fun Bitmap.centerCropped(zoom: Float): Bitmap {
+    if (zoom <= 1f) return this
+    val w = (width / zoom).toInt()
+    val h = (height / zoom).toInt()
+    val cropped = Bitmap.createBitmap(this, (width - w) / 2, (height - h) / 2, w, h)
+    recycle()
+    return cropped
 }
 
 private fun Bitmap.rotated(degrees: Int): Bitmap {

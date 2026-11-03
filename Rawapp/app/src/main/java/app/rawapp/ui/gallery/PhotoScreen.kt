@@ -20,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -39,6 +38,7 @@ import app.rawapp.ui.components.GlassPill
 import app.rawapp.ui.components.GlassSegmented
 import app.rawapp.ui.components.MessageScreen
 import app.rawapp.ui.components.glass
+import app.rawapp.ui.components.shareImage
 import app.rawapp.ui.theme.RawappColors
 
 private enum class ViewMode(val label: String) { Look("Rawapp"), Neutral("Sin look") }
@@ -50,13 +50,7 @@ fun PhotoScreen(viewModel: GalleryViewModel, onBack: () -> Unit) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LaunchedEffect(viewModel) {
-        viewModel.shareRequests.collect { file ->
-            val send = Intent(Intent.ACTION_SEND)
-                .setType(file.mimeType)
-                .putExtra(Intent.EXTRA_STREAM, file.uri)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            context.startActivity(Intent.createChooser(send, "Compartir foto"))
-        }
+        viewModel.shareRequests.collect { context.shareImage(it.uri, it.mimeType) }
     }
     val state = editor ?: return
     var selected by rememberSaveable { mutableStateOf(Adjustment.Exposure) }

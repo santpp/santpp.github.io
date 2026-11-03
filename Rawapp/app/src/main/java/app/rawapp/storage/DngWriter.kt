@@ -15,13 +15,17 @@ import java.util.Locale
 private const val RAWAPP_RELATIVE_PATH = "Pictures/Rawapp/"
 private const val DNG_MIME = "image/x-adobe-dng"
 
+data class SavedDng(val uri: Uri, val displayName: String)
+
 /** Writes a RAW capture as DNG into Pictures/Rawapp via MediaStore. */
 class DngWriter(private val resolver: ContentResolver) {
 
-    fun write(capture: RawCapture, rotationDegrees: Int, takenAt: Date = Date()): Uri {
+    /** Returns the new file's URI and display name. */
+    fun write(capture: RawCapture, rotationDegrees: Int, takenAt: Date = Date()): SavedDng {
+        val name = fileName(takenAt)
         val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(takenAt))
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
             put(MediaStore.Images.Media.MIME_TYPE, DNG_MIME)
             put(MediaStore.Images.Media.RELATIVE_PATH, RAWAPP_RELATIVE_PATH)
             put(MediaStore.Images.Media.DATE_TAKEN, takenAt.time)
@@ -36,7 +40,7 @@ class DngWriter(private val resolver: ContentResolver) {
                 }
             } ?: throw IOException("No se pudo abrir el archivo de destino")
             resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-            return uri
+            return SavedDng(uri, name)
         } catch (e: Exception) {
             resolver.delete(uri, null, null)
             throw IOException("No se pudo guardar el DNG: ${e.message}", e)

@@ -18,7 +18,13 @@ enum class Adjustment(
     Saturation("Saturación", 0f..1.8f, LookParams::saturation, { p, v -> p.copy(saturation = v) }, ::percent),
     Grain("Grano", 0f..1f, LookParams::grain, { p, v -> p.copy(grain = v) }, ::percent),
     Halation("Halación", 0f..1.5f, LookParams::halation, { p, v -> p.copy(halation = v) }, ::percent),
+    Zoom("Recorte", 1f..MAX_CROP_ZOOM, LookParams::zoom, { p, v -> p.copy(zoom = v) }, ::zoomLabel),
 }
+
+/** Digital zoom limit: at 3× a 12 MP frame still keeps ~1.3 MP. */
+const val MAX_CROP_ZOOM = 3f
+
+fun zoomLabel(v: Float): String = String.format(SPANISH, "%.1f×", v)
 
 private val SPANISH: Locale = Locale.forLanguageTag("es-ES")
 

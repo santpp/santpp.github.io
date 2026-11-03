@@ -8,7 +8,7 @@ class SidecarCodecTest {
 
     @Test
     fun roundTripsAllAdjustments() {
-        val params = LookParams(exposureEv = -1.25f, temperatureMired = 30f, contrast = 1.2f, saturation = 0.8f, grain = 0.1f, halation = 0f)
+        val params = LookParams(exposureEv = -1.25f, temperatureMired = 30f, contrast = 1.2f, saturation = 0.8f, grain = 0.1f, halation = 0f, zoom = 2.2f)
         assertEquals(params, SidecarCodec.decode(SidecarCodec.encode(params)))
     }
 

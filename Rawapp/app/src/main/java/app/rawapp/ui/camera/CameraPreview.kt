@@ -8,10 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
-/** SurfaceView sized to the camera preview stream; reports its Surface lifecycle. */
+/**
+ * SurfaceView sized to the camera preview stream; reports its Surface lifecycle.
+ * Digital zoom is shown by scaling the view (the RAW is always the full sensor).
+ */
 @Composable
 fun CameraPreview(
     previewSize: Size,
+    zoom: Float,
     onSurfaceAvailable: (Surface) -> Unit,
     onSurfaceDestroyed: () -> Unit,
     modifier: Modifier = Modifier,
@@ -28,6 +32,10 @@ fun CameraPreview(
                 })
             }
         },
-        update = { view -> view.holder.setFixedSize(previewSize.width, previewSize.height) },
+        update = { view ->
+            view.holder.setFixedSize(previewSize.width, previewSize.height)
+            view.scaleX = zoom
+            view.scaleY = zoom
+        },
     )
 }

@@ -57,17 +57,23 @@ class GalleryRepository(context: Context) {
         return parseDng(bytes)
     }
 
-    fun loadParams(photo: Photo): LookParams {
-        val file = sidecarFile(photo)
+    fun loadParams(photo: Photo): LookParams = loadParams(photo.displayName)
+
+    fun loadParams(displayName: String): LookParams {
+        val file = sidecarFile(displayName)
         return if (file.exists()) SidecarCodec.decode(file.readText()) else LookParams()
     }
 
     fun saveParams(photo: Photo, params: LookParams) {
-        val file = sidecarFile(photo)
+        saveParams(photo.displayName, params)
+        thumbDir.listFiles { f -> f.name.startsWith("${photo.id}_") }?.forEach(File::delete)
+    }
+
+    fun saveParams(displayName: String, params: LookParams) {
+        val file = sidecarFile(displayName)
         val tmp = File(file.path + ".tmp")
         tmp.writeText(SidecarCodec.encode(params))
         if (!tmp.renameTo(file)) throw IOException("No se pudo guardar los ajustes")
-        thumbDir.listFiles { f -> f.name.startsWith("${photo.id}_") }?.forEach(File::delete)
     }
 
     fun cachedThumbnail(photo: Photo, params: LookParams): Bitmap? =
@@ -77,7 +83,7 @@ class GalleryRepository(context: Context) {
         thumbFile(photo, params).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, THUMB_QUALITY, it) }
     }
 
-    private fun sidecarFile(photo: Photo) = File(sidecarDir, photo.displayName.substringBeforeLast('.') + ".json")
+    private fun sidecarFile(displayName: String) = File(sidecarDir, displayName.substringBeforeLast('.') + ".json")
 
     private fun thumbFile(photo: Photo, params: LookParams) = File(thumbDir, "${photo.id}_${params.hashCode()}.jpg")
 }

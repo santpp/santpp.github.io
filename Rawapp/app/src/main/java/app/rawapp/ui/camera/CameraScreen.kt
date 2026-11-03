@@ -19,6 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import app.rawapp.ui.components.shareImage
+import app.rawapp.ui.gallery.zoomLabel
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -90,6 +97,10 @@ private fun CameraContent(
 ) {
     val lens = state.selected
     val shotState by viewModel.shotState.collectAsStateWithLifecycle()
+    val zoom by viewModel.zoom.collectAsStateWithLifecycle()
+    val lastShot by viewModel.lastShot.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) { viewModel.shareRequests.collect { context.shareImage(it.uri, it.mimeType) } }
     val deviceRotation by rememberDeviceRotation()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     var surface by remember { mutableStateOf<Surface?>(null) }
@@ -101,15 +112,24 @@ private fun CameraContent(
     }
     DisposableEffect(Unit) { onDispose { viewModel.stop() } }
 
-    Box(Modifier.fillMaxSize().background(RawappColors.Background)) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(RawappColors.Background)
+            .pointerInput(viewModel) {
+                detectTransformGestures { _, _, gestureZoom, _ -> viewModel.setZoom(viewModel.zoom.value * gestureZoom) }
+            },
+    ) {
         CameraPreview(
             previewSize = lens.previewSize,
+            zoom = zoom,
             onSurfaceAvailable = { surface = it },
             onSurfaceDestroyed = { surface = null },
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(lens.previewSize.height.toFloat() / lens.previewSize.width)
-                .align(Alignment.Center),
+                .align(Alignment.Center)
+                .clipToBounds(),
         )
         Row(
             modifier = Modifier
@@ -134,6 +154,7 @@ private fun CameraContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             ShotStatus(shotState)
+            if (zoom > 1.01f) GlassPill(zoomLabel(zoom), color = RawappColors.Accent)
             if (state.lenses.size > 1) {
                 GlassSegmented(
                     options = state.lenses,
@@ -150,6 +171,14 @@ private fun CameraContent(
                     onClick = { viewModel.shoot(deviceRotation) },
                     modifier = Modifier.align(Alignment.Center),
                 )
+                if (lastShot != null && shotState != ShotState.Saving && shotState != ShotState.Developing) {
+                    GlassIconButton(
+                        Icons.Filled.Share,
+                        "Compartir la última foto revelada",
+                        viewModel::shareLastShot,
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    )
+                }
             }
         }
     }

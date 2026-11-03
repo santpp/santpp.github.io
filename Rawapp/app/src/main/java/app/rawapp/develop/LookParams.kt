@@ -11,6 +11,7 @@ data class LookParams(
     val saturation: Float = 1f,
     val grain: Float = 0.5f,
     val halation: Float = 0.6f,
+    val zoom: Float = 1f,
 )
 
 /** The fixed character of the look, derived from [LookParams]. */

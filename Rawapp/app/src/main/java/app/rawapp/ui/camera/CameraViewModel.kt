@@ -17,6 +17,12 @@ import app.rawapp.develop.LookParams
 import app.rawapp.gallery.GalleryRepository
 import app.rawapp.storage.DngWriter
 import app.rawapp.storage.PhotoExporter
+import app.rawapp.storage.SavedDng
+import app.rawapp.storage.SharedFile
+import app.rawapp.ui.gallery.MAX_CROP_ZOOM
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +68,15 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _shotState = MutableStateFlow<ShotState>(ShotState.Idle)
     val shotState: StateFlow<ShotState> = _shotState.asStateFlow()
 
+    private val _zoom = MutableStateFlow(1f)
+    val zoom: StateFlow<Float> = _zoom.asStateFlow()
+
+    private val _lastShot = MutableStateFlow<SavedDng?>(null)
+    val lastShot: StateFlow<SavedDng?> = _lastShot.asStateFlow()
+
+    private val shareChannel = Channel<SharedFile>(Channel.BUFFERED)
+    val shareRequests: Flow<SharedFile> = shareChannel.receiveAsFlow()
+
     private var openJob: Job? = null
     private var shotJob: Job? = null
 
@@ -78,6 +93,31 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val ready = _uiState.value as? CameraUiState.Ready ?: return
         if (_shotState.value == ShotState.Saving) return
         _uiState.value = ready.copy(selected = lens)
+        _zoom.value = 1f
+    }
+
+    fun setZoom(value: Float) {
+        _zoom.value = value.coerceIn(1f, MAX_CROP_ZOOM)
+    }
+
+    /** Develops the last DNG with the look and opens the share sheet in one step. */
+    fun shareLastShot() {
+        val shot = _lastShot.value ?: return
+        if (_shotState.value == ShotState.Saving || _shotState.value == ShotState.Developing) return
+        val format = app.settings.settings.value.exportFormat
+        viewModelScope.launch {
+            _shotState.value = ShotState.Developing
+            val result = try {
+                val file = SharedFile(developAndExport(shot), format.mimeType)
+                shareChannel.send(file)
+                ShotState.Exported
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ShotState.Failed("Compartir: ${e.message ?: "error desconocido"}")
+            }
+            showShotMessage(result)
+        }
     }
 
     fun start(lens: Lens, surface: Surface) {
@@ -103,12 +143,17 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun shoot(deviceRotation: Int) {
         val lens = (_uiState.value as? CameraUiState.Ready)?.selected ?: return
         if (_shotState.value == ShotState.Saving) return
+        val zoom = _zoom.value
         shotJob = viewModelScope.launch {
             _shotState.value = ShotState.Saving
             val dng = try {
                 val rotation = captureRotationDegrees(lens.sensorOrientation, deviceRotation, lens.frontFacing)
                 controller.captureRaw().use { capture ->
-                    withContext(Dispatchers.IO) { writer.write(capture, rotation) }
+                    withContext(Dispatchers.IO) {
+                        writer.write(capture, rotation).also { saved ->
+                            if (zoom > 1f) repository.saveParams(saved.displayName, LookParams(zoom = zoom))
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -116,20 +161,17 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 showShotMessage(ShotState.Failed(e.message ?: "Error desconocido al guardar"))
                 return@launch
             }
+            _lastShot.value = dng
             if (app.settings.settings.value.autoExport) autoExport(dng) else showShotMessage(ShotState.Saved)
         }
     }
 
     /** Develops the saved DNG with the default look and exports it, without blocking the next shot. */
-    private fun autoExport(dng: Uri) {
-        val format = app.settings.settings.value.exportFormat
+    private fun autoExport(dng: SavedDng) {
         viewModelScope.launch {
             _shotState.value = ShotState.Developing
             val result = try {
-                val frame = withContext(Dispatchers.IO) { repository.readFrame(dng) }
-                val bitmap = app.developer.develop(frame, LookParams(), lookEnabled = true).bitmap
-                withContext(Dispatchers.IO) { exporter.export(bitmap, format) }
-                bitmap.recycle()
+                developAndExport(dng)
                 ShotState.Exported
             } catch (e: CancellationException) {
                 throw e
@@ -138,6 +180,16 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             }
             showShotMessage(result)
         }
+    }
+
+    /** Reads the DNG back, develops it with its saved adjustments and exports it in the chosen format. */
+    private suspend fun developAndExport(dng: SavedDng): Uri {
+        val format = app.settings.settings.value.exportFormat
+        val (frame, params) = withContext(Dispatchers.IO) {
+            repository.readFrame(dng.uri) to repository.loadParams(dng.displayName)
+        }
+        val bitmap = app.developer.develop(frame, params, lookEnabled = true).bitmap
+        return withContext(Dispatchers.IO) { exporter.export(bitmap, format) }.also { bitmap.recycle() }
     }
 
     private suspend fun showShotMessage(state: ShotState) {
