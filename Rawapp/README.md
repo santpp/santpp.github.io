@@ -7,8 +7,8 @@ Rawapp es una cámara RAW personal para el **Google Pixel 10a**. Captura DNG dir
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Esqueleto, permiso, preview, captura RAW → DNG en `Pictures/Rawapp/`, diagnóstico, selector de lente | Hecha |
-| 2 | Revelado GLES (pipeline + look) | Hecha, pendiente de verificar en el Pixel |
-| 3 | Galería con edición en vivo, sidecar JSON | Pendiente |
+| 2 | Revelado GLES (pipeline + look) | Hecha |
+| 3 | Galería con edición en vivo, sidecar JSON | Hecha, pendiente de verificar en el Pixel |
 | 4 | Exportación JPEG/HEIC, auto-exportar, compartir | Adelantado: "Guardar JPEG" en la pantalla Revelar. Pendientes HEIC, auto-exportar y compartir |
 
 ## Requisitos
@@ -43,17 +43,21 @@ app/src/main/java/app/rawapp/
   storage/
     DngWriter.kt                  DngCreator → MediaStore (Pictures/Rawapp/)
     JpegExporter.kt               JPEG revelado y ya girado → Pictures/Rawapp/Exports/
-    RawFrameFactory.kt            Copia RAW16 + metadatos de una captura a un RawFrame
   develop/
     RawFrame.kt                   Datos Bayer + calibración, independiente de Camera2
     LookParams.kt                 Ajustes del usuario y carácter fijo del look (FilmLook)
     RawDeveloper.kt               Hilo GL dedicado; revela un RawFrame a Bitmap
     RawSampling.kt                Muestreo de verdes para la exposición automática
+    RawFrameSubsample.kt          Mosaico Bayer reducido (1 de cada N teselas) para previsualizar en vivo
+    dng/                          Lector DNG propio: TIFF, etiquetas DNG, GainMap de OpcodeList2
+  gallery/
+    GalleryRepository.kt          DNG de Rawapp en MediaStore, sidecars y caché de miniaturas
+    SidecarCodec.kt               Ajustes por foto ↔ JSON (testeado)
     math/                         Matemática pura con tests: Mat3, cromaticidad, matrices DNG,
                                   balance de blancos, curva tonal, LUT 3D, exposición automática
     gl/                           EGL off-screen, programas, render targets y pasadas
   ui/
-    develop/                      Pantalla de revelado (Rawapp / Sin look) y su ViewModel
+    gallery/                      Cuadrícula, vista de detalle con zoom y sliders, ViewModel
     RawappApp.kt                  Navegación mínima y control del permiso de cámara
     theme/Theme.kt                Colores, tipografía, tokens de cristal
     components/                   Superficie "glass", botones, pantalla de mensaje
@@ -105,6 +109,20 @@ Calibración v3: se comparó una pareja de fotos de la misma escena, una de la c
 - **Cambios observados:** el cielo azul claro pasa a crema cálido, la mediana baja de 0,36 a 0,21 (un look denso) y los verdes van hacia oliva y más oscuros.
 - **Ajustes:** contraste 1,6, gris medio en 0,12, exposición automática más baja, altas luces más cálidas y desaturadas, azules saturados hacia teal con menos densidad de azul, y verdes hacia oliva.
 
+## Galería (Fase 3)
+
+- **Cuadrícula:** muestra los DNG de `Pictures/Rawapp/` con el look aplicado. Las miniaturas se revelan a ¼ de resolución (1000×750) y se guardan en caché en `cacheDir/thumbs`.
+- **Vista de detalle:** zoom con pellizco y doble toque. Hay sliders de exposición, temperatura, contraste, saturación, grano y halación, y los modos Rawapp / Sin look.
+- **Edición en vivo:** mientras mueves un slider se revela a ½ resolución. A los 350 ms sin cambios se revela a resolución completa.
+- **Ajustes guardados:** se guardan en un JSON por foto. La especificación pedía el sidecar *junto al DNG*, pero MediaStore no admite archivos JSON en `Pictures/`. Por eso se guardan en el almacenamiento privado de la app (`files/sidecars/<nombre>.json`). El DNG nunca se modifica.
+- **Guardar JPEG:** desde el detalle, con los ajustes aplicados y a resolución completa.
+
+## Firma
+
+`signing/rawapp.keystore` es la clave de depuración con la que se firmaron los primeros APK. Va en el repositorio para que cualquier compilación, en cualquier máquina, produzca APK que se instalen encima sin desinstalar. Es una clave de depuración sin valor de seguridad: no la uses para publicar nada.
+
+**Play Protect** avisa de cualquier app instalada fuera de Play Store de un desarrollador que Google no conoce, y ninguna firma propia elimina ese aviso. Con una clave estable, al menos, las actualizaciones se instalan encima de la versión anterior.
+
 ## Dependencias
 
 - `androidx.activity:activity-compose`: `setContent`, el contrato de permisos y `BackHandler`.
@@ -122,5 +140,6 @@ La Fase 2 no añade dependencias: EGL y GLES vienen en el SDK.
 - La etiqueta de zoom se calcula a partir de la focal y el tamaño del sensor, así que es aproximada.
 - La interfaz está fijada en vertical. La orientación de la foto se calcula con el sensor de orientación y se escribe en el DNG.
 - El efecto cristal no desenfoca la preview, por la limitación de Compose ya explicada.
-- La pantalla "Revelar" solo muestra la última foto de la sesión. La galería con todos los DNG llega en la Fase 3.
+- La galería solo ve los DNG creados por esta instalación de Rawapp. MediaStore da acceso sin permisos a los archivos propios. Si desinstalas la app, las fotos siguen en `Pictures/Rawapp/`, pero la galería no las verá.
+- El lector DNG solo admite el formato que escribe `DngCreator`: Bayer, 16 bits, sin compresión.
 - La exposición automática del revelado (de −1 a +3 EV) compensa la subexposición del RAW del Pixel. Se puede ajustar en la Fase 3.

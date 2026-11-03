@@ -30,7 +30,7 @@ internal class GlPipeline(assets: AssetManager) : AutoCloseable {
     private val shadingTexture = createTexture(GLES30.GL_TEXTURE_2D, GLES30.GL_LINEAR)
     private val curveTexture = createTexture(GLES30.GL_TEXTURE_2D, GLES30.GL_LINEAR)
     private val lutTexture = createTexture(GLES30.GL_TEXTURE_3D, GLES30.GL_LINEAR)
-    private var targets: Targets? = null
+    private val targets = HashMap<Long, Targets>()
     private var bakedCurveFor: LookParams? = null
     private var bakedLutFor: LookParams? = null
 
@@ -65,7 +65,8 @@ internal class GlPipeline(assets: AssetManager) : AutoCloseable {
     }
 
     override fun close() {
-        targets?.close()
+        targets.values.forEach(Targets::close)
+        targets.clear()
         GLES30.glDeleteTextures(4, intArrayOf(rawTexture, shadingTexture, curveTexture, lutTexture), 0)
         GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
         listOf(demosaic, extract, blur, look).forEach(GlProgram::close)
@@ -177,11 +178,9 @@ internal class GlPipeline(assets: AssetManager) : AutoCloseable {
         bakedLutFor = params
     }
 
-    private fun targetsFor(width: Int, height: Int): Targets {
-        targets?.takeIf { it.output.width == width && it.output.height == height }?.let { return it }
-        targets?.close()
-        return Targets(width, height).also { targets = it }
-    }
+    /** Render targets are kept per size so thumbnail, preview and full renders don't reallocate. */
+    private fun targetsFor(width: Int, height: Int): Targets =
+        targets.getOrPut((width.toLong() shl 32) or height.toLong()) { Targets(width, height) }
 
     private fun bindTexture(unit: Int, target: Int, texture: Int, uniform: Int) {
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0 + unit)

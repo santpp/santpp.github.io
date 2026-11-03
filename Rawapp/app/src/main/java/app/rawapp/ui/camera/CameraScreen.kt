@@ -42,13 +42,12 @@ import app.rawapp.ui.components.GlassIconButton
 import app.rawapp.ui.components.GlassPill
 import app.rawapp.ui.components.GlassSegmented
 import app.rawapp.ui.components.GlassButton
-import app.rawapp.develop.RawFrame
 import app.rawapp.ui.components.MessageScreen
 import app.rawapp.ui.components.glass
 import app.rawapp.ui.theme.RawappColors
 
 @Composable
-fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit, onOpenDevelop: (RawFrame) -> Unit) {
+fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit, onOpenGallery: () -> Unit) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     when (val state = uiState) {
         CameraUiState.Loading -> LoadingState()
@@ -64,7 +63,7 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit, onOp
             actionLabel = "Reintentar",
             onAction = viewModel::retry,
         )
-        is CameraUiState.Ready -> CameraContent(state, viewModel, onOpenDiagnostics, onOpenDevelop)
+        is CameraUiState.Ready -> CameraContent(state, viewModel, onOpenDiagnostics, onOpenGallery)
     }
 }
 
@@ -80,10 +79,9 @@ private fun CameraContent(
     state: CameraUiState.Ready,
     viewModel: CameraViewModel,
     onOpenDiagnostics: () -> Unit,
-    onOpenDevelop: (RawFrame) -> Unit,
+    onOpenGallery: () -> Unit,
 ) {
     val lens = state.selected
-    val lastFrame by viewModel.lastFrame.collectAsStateWithLifecycle()
     val shotState by viewModel.shotState.collectAsStateWithLifecycle()
     val deviceRotation by rememberDeviceRotation()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
@@ -136,9 +134,7 @@ private fun CameraContent(
                 )
             }
             Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                lastFrame?.let { frame ->
-                    GlassButton("Revelar", onClick = { onOpenDevelop(frame) }, modifier = Modifier.align(Alignment.CenterStart))
-                }
+                GlassButton("Galería", onClick = onOpenGallery, modifier = Modifier.align(Alignment.CenterStart))
                 ShutterButton(
                     enabled = shotState != ShotState.Saving,
                     onClick = { viewModel.shoot(deviceRotation) },

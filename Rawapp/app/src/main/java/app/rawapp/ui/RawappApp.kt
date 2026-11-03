@@ -12,47 +12,54 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.rawapp.develop.RawFrame
 import app.rawapp.ui.camera.CameraScreen
-import app.rawapp.ui.develop.DevelopScreen
-import app.rawapp.ui.develop.DevelopViewModel
+import app.rawapp.ui.gallery.GalleryScreen
+import app.rawapp.ui.gallery.GalleryViewModel
+import app.rawapp.ui.gallery.PhotoScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.rawapp.ui.components.MessageScreen
 import app.rawapp.ui.diagnostics.DiagnosticsScreen
 
-private enum class Screen { Camera, Diagnostics, Develop }
+private enum class Screen { Camera, Diagnostics, Gallery, Photo }
 
 @Composable
 fun RawappApp() {
     var screen by rememberSaveable { mutableStateOf(Screen.Camera) }
-    var developFrame by remember { mutableStateOf<RawFrame?>(null) }
+    val galleryViewModel: GalleryViewModel = viewModel()
     when (screen) {
         Screen.Camera -> CameraPermissionGate {
             CameraScreen(
                 viewModel(),
                 onOpenDiagnostics = { screen = Screen.Diagnostics },
-                onOpenDevelop = { frame ->
-                    developFrame = frame
-                    screen = Screen.Develop
+                onOpenGallery = { screen = Screen.Gallery },
+            )
+        }
+        Screen.Gallery -> {
+            BackHandler { screen = Screen.Camera }
+            GalleryScreen(
+                galleryViewModel,
+                onBack = { screen = Screen.Camera },
+                onOpen = { photo ->
+                    galleryViewModel.open(photo)
+                    screen = Screen.Photo
                 },
             )
         }
-        Screen.Develop -> {
-            val frame = developFrame
-            if (frame == null) {
-                screen = Screen.Camera
-            } else {
-                BackHandler { screen = Screen.Camera }
-                val developViewModel: DevelopViewModel = viewModel()
-                LaunchedEffect(frame) { developViewModel.show(frame) }
-                DevelopScreen(developViewModel, onBack = { screen = Screen.Camera })
+        Screen.Photo -> {
+            val closePhoto = {
+                galleryViewModel.close()
+                screen = Screen.Gallery
             }
+            BackHandler(onBack = closePhoto)
+            val editor by galleryViewModel.editor.collectAsStateWithLifecycle()
+            LaunchedEffect(editor == null) { if (editor == null) screen = Screen.Gallery }
+            PhotoScreen(galleryViewModel, onBack = closePhoto)
         }
         Screen.Diagnostics -> {
             BackHandler { screen = Screen.Camera }
