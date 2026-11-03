@@ -7,6 +7,10 @@ import androidx.lifecycle.viewModelScope
 import app.rawapp.develop.LookParams
 import app.rawapp.develop.RawDeveloper
 import app.rawapp.develop.RawFrame
+import app.rawapp.storage.JpegExporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,9 +26,19 @@ sealed interface DevelopUiState {
     data class Error(val message: String) : DevelopUiState
 }
 
+sealed interface ExportState {
+    data object Idle : ExportState
+    data object Saving : ExportState
+    data object Saved : ExportState
+    data class Failed(val message: String) : ExportState
+}
+
+private const val EXPORT_MESSAGE_MS = 2_500L
+
 class DevelopViewModel(application: Application) : AndroidViewModel(application) {
 
     private val developer = RawDeveloper(application.assets)
+    private val exporter = JpegExporter(application.contentResolver)
     private var frame: RawFrame? = null
     private var job: Job? = null
 
@@ -33,6 +47,27 @@ class DevelopViewModel(application: Application) : AndroidViewModel(application)
 
     private val _mode = MutableStateFlow(DevelopMode.Look)
     val mode: StateFlow<DevelopMode> = _mode.asStateFlow()
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
+
+    fun exportJpeg() {
+        val ready = _uiState.value as? DevelopUiState.Ready ?: return
+        if (_exportState.value == ExportState.Saving) return
+        viewModelScope.launch {
+            _exportState.value = ExportState.Saving
+            _exportState.value = try {
+                withContext(Dispatchers.IO) { exporter.export(ready.bitmap) }
+                ExportState.Saved
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ExportState.Failed(e.message ?: "Error desconocido al exportar")
+            }
+            delay(EXPORT_MESSAGE_MS)
+            _exportState.value = ExportState.Idle
+        }
+    }
 
     fun show(newFrame: RawFrame) {
         if (newFrame === frame) return

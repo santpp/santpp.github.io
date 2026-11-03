@@ -9,7 +9,7 @@ Rawapp es una cámara RAW personal para el **Google Pixel 10a**. Captura DNG dir
 | 1 | Esqueleto, permiso, preview, captura RAW → DNG en `Pictures/Rawapp/`, diagnóstico, selector de lente | Hecha |
 | 2 | Revelado GLES (pipeline + look) | Hecha, pendiente de verificar en el Pixel |
 | 3 | Galería con edición en vivo, sidecar JSON | Pendiente |
-| 4 | Exportación JPEG/HEIC, auto-exportar, compartir | Pendiente |
+| 4 | Exportación JPEG/HEIC, auto-exportar, compartir | Adelantado: "Guardar JPEG" en la pantalla Revelar. Pendientes HEIC, auto-exportar y compartir |
 
 ## Requisitos
 
@@ -42,6 +42,7 @@ app/src/main/java/app/rawapp/
     RawCapture.kt                 Image RAW + resultado + características
   storage/
     DngWriter.kt                  DngCreator → MediaStore (Pictures/Rawapp/)
+    JpegExporter.kt               JPEG revelado y ya girado → Pictures/Rawapp/Exports/
     RawFrameFactory.kt            Copia RAW16 + metadatos de una captura a un RawFrame
   develop/
     RawFrame.kt                   Datos Bayer + calibración, independiente de Camera2
