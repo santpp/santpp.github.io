@@ -49,9 +49,11 @@ class GalleryRepository(context: Context) {
         }
     }
 
-    fun readFrame(photo: Photo): RawFrame {
-        val bytes = resolver.openInputStream(photo.uri)?.use { it.readBytes() }
-            ?: throw IOException("No se pudo abrir ${photo.displayName}")
+    fun readFrame(photo: Photo): RawFrame = readFrame(photo.uri)
+
+    fun readFrame(uri: android.net.Uri): RawFrame {
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("No se pudo abrir la foto")
         return parseDng(bytes)
     }
 

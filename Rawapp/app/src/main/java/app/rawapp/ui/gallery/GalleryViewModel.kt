@@ -5,12 +5,16 @@ import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.rawapp.develop.LookParams
-import app.rawapp.develop.RawDeveloper
+import app.rawapp.RawappApplication
 import app.rawapp.develop.RawFrame
 import app.rawapp.develop.subsampled
 import app.rawapp.gallery.GalleryRepository
 import app.rawapp.gallery.Photo
-import app.rawapp.storage.JpegExporter
+import android.net.Uri
+import app.rawapp.storage.PhotoExporter
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,14 +57,22 @@ private const val THUMB_MAX_SIDE = 360
 private const val FULL_RENDER_DELAY_MS = 350L
 private const val MESSAGE_MS = 2_500L
 
+data class SharedFile(val uri: Uri, val mimeType: String)
+
 private data class RenderRequest(val params: LookParams, val lookEnabled: Boolean)
 
 /** Gallery grid, thumbnail rendering and the live editor of one photo. */
 class GalleryViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = GalleryRepository(application)
-    private val developer = RawDeveloper(application.assets)
-    private val exporter = JpegExporter(application.contentResolver)
+    private val app = application as RawappApplication
+    private val developer = app.developer
+    private val exporter = PhotoExporter(application.contentResolver)
+
+    val settings = app.settings.settings
+
+    private val shareChannel = Channel<SharedFile>(Channel.BUFFERED)
+    val shareRequests: Flow<SharedFile> = shareChannel.receiveAsFlow()
 
     private val _gallery = MutableStateFlow<GalleryState>(GalleryState.Loading)
     val gallery: StateFlow<GalleryState> = _gallery.asStateFlow()
@@ -143,16 +155,22 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         renderRequests.value = RenderRequest(state.params, enabled)
     }
 
-    fun exportJpeg() {
+    fun export() = exportCurrent(share = false)
+
+    fun share() = exportCurrent(share = true)
+
+    private fun exportCurrent(share: Boolean) {
         val state = _editor.value ?: return
         val full = frame ?: return
         if (_exportState.value == ExportState.Saving) return
+        val format = settings.value.exportFormat
         viewModelScope.launch {
             _exportState.value = ExportState.Saving
             _exportState.value = try {
                 val bitmap = developer.develop(full, state.params, state.lookEnabled).bitmap
-                withContext(Dispatchers.IO) { exporter.export(bitmap) }
+                val uri = withContext(Dispatchers.IO) { exporter.export(bitmap, format) }
                 bitmap.recycle()
+                if (share) shareChannel.send(SharedFile(uri, format.mimeType))
                 ExportState.Saved
             } catch (e: CancellationException) {
                 throw e
@@ -162,10 +180,6 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
             delay(MESSAGE_MS)
             _exportState.value = ExportState.Idle
         }
-    }
-
-    override fun onCleared() {
-        developer.close()
     }
 
     private suspend fun render(request: RenderRequest) {

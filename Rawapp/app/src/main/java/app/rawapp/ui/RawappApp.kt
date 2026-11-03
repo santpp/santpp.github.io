@@ -18,7 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.rawapp.RawappApplication
 import app.rawapp.ui.camera.CameraScreen
+import app.rawapp.ui.settings.SettingsScreen
 import app.rawapp.ui.gallery.GalleryScreen
 import app.rawapp.ui.gallery.GalleryViewModel
 import app.rawapp.ui.gallery.PhotoScreen
@@ -26,7 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.rawapp.ui.components.MessageScreen
 import app.rawapp.ui.diagnostics.DiagnosticsScreen
 
-private enum class Screen { Camera, Diagnostics, Gallery, Photo }
+private enum class Screen { Camera, Diagnostics, Gallery, Photo, Settings }
 
 @Composable
 fun RawappApp() {
@@ -38,6 +40,7 @@ fun RawappApp() {
                 viewModel(),
                 onOpenDiagnostics = { screen = Screen.Diagnostics },
                 onOpenGallery = { screen = Screen.Gallery },
+                onOpenSettings = { screen = Screen.Settings },
             )
         }
         Screen.Gallery -> {
@@ -60,6 +63,10 @@ fun RawappApp() {
             val editor by galleryViewModel.editor.collectAsStateWithLifecycle()
             LaunchedEffect(editor == null) { if (editor == null) screen = Screen.Gallery }
             PhotoScreen(galleryViewModel, onBack = closePhoto)
+        }
+        Screen.Settings -> {
+            BackHandler { screen = Screen.Camera }
+            SettingsScreen((LocalContext.current.applicationContext as RawappApplication).settings, onBack = { screen = Screen.Camera })
         }
         Screen.Diagnostics -> {
             BackHandler { screen = Screen.Camera }

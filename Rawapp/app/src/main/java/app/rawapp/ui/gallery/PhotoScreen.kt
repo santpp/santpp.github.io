@@ -14,12 +14,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,6 +47,17 @@ private enum class ViewMode(val label: String) { Look("Rawapp"), Neutral("Sin lo
 fun PhotoScreen(viewModel: GalleryViewModel, onBack: () -> Unit) {
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val exportState by viewModel.exportState.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.shareRequests.collect { file ->
+            val send = Intent(Intent.ACTION_SEND)
+                .setType(file.mimeType)
+                .putExtra(Intent.EXTRA_STREAM, file.uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(Intent.createChooser(send, "Compartir foto"))
+        }
+    }
     val state = editor ?: return
     var selected by rememberSaveable { mutableStateOf(Adjustment.Exposure) }
 
@@ -65,7 +80,12 @@ fun PhotoScreen(viewModel: GalleryViewModel, onBack: () -> Unit) {
         ) {
             GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Volver a la galería", onBack)
             ExportStatus(exportState, state.fullResolution)
-            GlassIconButton(Icons.Filled.Refresh, "Restablecer ajustes", { viewModel.adjust(LookParams()) })
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassIconButton(Icons.Filled.Refresh, "Restablecer ajustes", { viewModel.adjust(LookParams()) })
+                if (state.image != null && exportState != ExportState.Saving) {
+                    GlassIconButton(Icons.Filled.Share, "Compartir", viewModel::share)
+                }
+            }
         }
 
         Column(
@@ -91,7 +111,7 @@ fun PhotoScreen(viewModel: GalleryViewModel, onBack: () -> Unit) {
                     onSelect = { viewModel.setLookEnabled(it == ViewMode.Look) },
                 )
                 if (exportState != ExportState.Saving && state.image != null) {
-                    GlassButton("Guardar JPEG", onClick = viewModel::exportJpeg)
+                    GlassButton("Guardar ${settings.exportFormat.label}", onClick = viewModel::export)
                 }
             }
         }
@@ -136,7 +156,7 @@ private fun AdjustmentSlider(adjustment: Adjustment, params: LookParams, enabled
 private fun ExportStatus(state: ExportState, fullResolution: Boolean) {
     when (state) {
         ExportState.Idle -> if (!fullResolution) GlassPill("Vista previa")
-        ExportState.Saving -> GlassPill("Guardando JPEG…")
+        ExportState.Saving -> GlassPill("Exportando…")
         ExportState.Saved -> GlassPill("Guardado en Exports", color = RawappColors.Accent)
         is ExportState.Failed -> GlassPill(state.message, color = RawappColors.Error)
     }

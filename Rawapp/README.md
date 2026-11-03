@@ -8,8 +8,8 @@ Rawapp es una cámara RAW personal para el **Google Pixel 10a**. Captura DNG dir
 |---|---|---|
 | 1 | Esqueleto, permiso, preview, captura RAW → DNG en `Pictures/Rawapp/`, diagnóstico, selector de lente | Hecha |
 | 2 | Revelado GLES (pipeline + look) | Hecha |
-| 3 | Galería con edición en vivo, sidecar JSON | Hecha, pendiente de verificar en el Pixel |
-| 4 | Exportación JPEG/HEIC, auto-exportar, compartir | Adelantado: "Guardar JPEG" en la pantalla Revelar. Pendientes HEIC, auto-exportar y compartir |
+| 3 | Galería con edición en vivo, sidecar JSON | Hecha |
+| 4 | Exportación JPEG/HEIC, auto-exportar, compartir | Hecha, pendiente de verificar en el Pixel |
 
 ## Requisitos
 
@@ -33,6 +33,7 @@ También puedes abrir la carpeta `Rawapp/` en Android Studio y pulsar *Run*.
 ```
 app/src/main/java/app/rawapp/
   MainActivity.kt                 Activity única, edge-to-edge
+  RawappApplication.kt            Un solo RawDeveloper (contexto GL) y las preferencias para toda la app
   camera/
     CameraController.kt           CameraDevice + sesión (preview + RAW_SENSOR), captura, liberación
     Lens.kt                       Lentes con RAW (físicas dentro de la cámara lógica) y su preview
@@ -42,7 +43,8 @@ app/src/main/java/app/rawapp/
     RawCapture.kt                 Image RAW + resultado + características
   storage/
     DngWriter.kt                  DngCreator → MediaStore (Pictures/Rawapp/)
-    JpegExporter.kt               JPEG revelado y ya girado → Pictures/Rawapp/Exports/
+    PhotoExporter.kt              JPEG o HEIC revelado y ya girado → Pictures/Rawapp/Exports/
+    Settings.kt                   Preferencias (formato, auto-exportar) en SharedPreferences
   develop/
     RawFrame.kt                   Datos Bayer + calibración, independiente de Camera2
     LookParams.kt                 Ajustes del usuario y carácter fijo del look (FilmLook)
@@ -63,6 +65,7 @@ app/src/main/java/app/rawapp/
     components/                   Superficie "glass", botones, pantalla de mensaje
     camera/                       Pantalla de cámara, ViewModel, SurfaceView, rotación física
     diagnostics/                  Pantalla y ViewModel de diagnóstico
+    settings/                     Formato de exportación y auto-exportar
 app/src/main/assets/shaders/      GLSL: demosaico, halación (extracción + blur), look final
 app/src/test/                     Tests unitarios de funciones puras
 ```
@@ -117,6 +120,13 @@ Calibración v3: se comparó una pareja de fotos de la misma escena, una de la c
 - **Ajustes guardados:** se guardan en un JSON por foto. La especificación pedía el sidecar *junto al DNG*, pero MediaStore no admite archivos JSON en `Pictures/`. Por eso se guardan en el almacenamiento privado de la app (`files/sidecars/<nombre>.json`). El DNG nunca se modifica.
 - **Guardar JPEG:** desde el detalle, con los ajustes aplicados y a resolución completa.
 
+## Exportación (Fase 4)
+
+- **Formato:** JPEG (calidad 95) o HEIC (calidad 92), a elegir en *Ajustes* (⚙ en la cámara). El giro va aplicado a los píxeles.
+- **Auto-exportar:** después de guardar el DNG, la app lo vuelve a leer y lo revela con el look por defecto con el mismo lector que usa la galería. Se puede seguir disparando mientras tanto.
+- **Compartir:** desde el detalle. Exporta en el formato elegido a `Exports/` y abre el selector de Android con esa foto. Así lo que compartes es siempre igual a lo que queda guardado.
+- **Contexto GL compartido:** la cámara y la galería usan un único `RawDeveloper` que vive en `RawappApplication`. Así solo existe un contexto EGL y un juego de buffers de GPU, y se libera cuando termina el proceso.
+
 ## Firma
 
 `signing/rawapp.keystore` es la clave de depuración con la que se firmaron los primeros APK. Va en el repositorio para que cualquier compilación, en cualquier máquina, produzca APK que se instalen encima sin desinstalar. Es una clave de depuración sin valor de seguridad: no la uses para publicar nada.
@@ -130,9 +140,10 @@ Calibración v3: se comparó una pareja de fotos de la misma escena, una de la c
 - `androidx.lifecycle:lifecycle-runtime-compose`: `collectAsStateWithLifecycle` y `LifecycleResumeEffect`, para abrir y cerrar la cámara según el ciclo de vida.
 - `androidx.compose.ui`, `foundation`, `material3` (BOM): la interfaz. Material3 solo aporta tipografía, el indicador de progreso y los iconos.
 - `androidx.compose.material:material-icons-core`: los iconos de información y de volver.
+- `androidx.heifwriter`: escribe HEIC con el codificador de hardware. `Bitmap.compress` no admite HEIC.
 - `junit`: los tests unitarios.
 
-La Fase 2 no añade dependencias: EGL y GLES vienen en el SDK.
+Las fases 2 y 3 no añaden dependencias: EGL, GLES y MediaStore vienen en el SDK.
 
 ## Limitaciones conocidas
 

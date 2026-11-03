@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,7 +48,12 @@ import app.rawapp.ui.components.glass
 import app.rawapp.ui.theme.RawappColors
 
 @Composable
-fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit, onOpenGallery: () -> Unit) {
+fun CameraScreen(
+    viewModel: CameraViewModel,
+    onOpenDiagnostics: () -> Unit,
+    onOpenGallery: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     when (val state = uiState) {
         CameraUiState.Loading -> LoadingState()
@@ -63,7 +69,7 @@ fun CameraScreen(viewModel: CameraViewModel, onOpenDiagnostics: () -> Unit, onOp
             actionLabel = "Reintentar",
             onAction = viewModel::retry,
         )
-        is CameraUiState.Ready -> CameraContent(state, viewModel, onOpenDiagnostics, onOpenGallery)
+        is CameraUiState.Ready -> CameraContent(state, viewModel, onOpenDiagnostics, onOpenGallery, onOpenSettings)
     }
 }
 
@@ -80,6 +86,7 @@ private fun CameraContent(
     viewModel: CameraViewModel,
     onOpenDiagnostics: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val lens = state.selected
     val shotState by viewModel.shotState.collectAsStateWithLifecycle()
@@ -113,7 +120,10 @@ private fun CameraContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GlassPill("RAW · DNG")
-            GlassIconButton(Icons.Outlined.Info, "Diagnóstico de cámaras", onOpenDiagnostics)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassIconButton(Icons.Outlined.Settings, "Ajustes", onOpenSettings)
+                GlassIconButton(Icons.Outlined.Info, "Diagnóstico de cámaras", onOpenDiagnostics)
+            }
         }
         Column(
             modifier = Modifier
@@ -151,6 +161,8 @@ private fun ShotStatus(state: ShotState) {
         when (state) {
             ShotState.Saving -> GlassPill("Guardando DNG…")
             ShotState.Saved -> GlassPill("Guardado en Pictures/Rawapp", color = RawappColors.Accent)
+            ShotState.Developing -> GlassPill("DNG guardado · revelando…")
+            ShotState.Exported -> GlassPill("DNG y revelado guardados", color = RawappColors.Accent)
             is ShotState.Failed -> GlassPill("Error al guardar: ${state.message}", color = RawappColors.Error)
             ShotState.Idle -> Unit
         }
