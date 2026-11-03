@@ -40,6 +40,12 @@ class FilmLutTest {
     }
 
     @Test
+    fun deepSkyStaysBlueCyanNotGreen() {
+        val out = gradeColor(Vec3(srgbDecode(0.25), srgbDecode(0.45), srgbDecode(0.75)), look)
+        assertTrue(out.z > out.y * 1.2)
+    }
+
+    @Test
     fun paleBlueSkyTurnsCream() {
         val out = gradeColor(Vec3(srgbDecode(0.81), srgbDecode(0.89), srgbDecode(0.94)), look)
         assertTrue(out.x >= out.z)

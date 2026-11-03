@@ -4,7 +4,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.log2
 
-private const val TARGET_LOG_AVERAGE = 0.09
+private const val TARGET_LOG_AVERAGE = 0.11
 private const val MIN_EV = -1.0
 private const val MAX_EV = 3.0
 
